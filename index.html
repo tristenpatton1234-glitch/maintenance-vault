@@ -1503,7 +1503,7 @@
                     }
                 } catch (error) {
                     console.error("Google Play Billing Error:", error);
-                    alert("Google Play purchase failed or was canceled.");
+                    alert("Google Play Billing Error: " + error.message + "\n\n" + (error.stack || ''));
                     return;
                 }
             }
