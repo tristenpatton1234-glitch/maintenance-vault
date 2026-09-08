@@ -1491,8 +1491,14 @@
                         
                         await response.complete('success');
                         
-                        const rc = window.rcInstance;
-                        await rc.syncPurchases(); 
+                       let rc = window.rcInstance;
+if (!rc && typeof Purchases !== 'undefined' && currentUser) {
+    const rcClass = Purchases.Purchases || Purchases;
+    rc = rcClass.configure({ apiKey: REVENUECAT_PUBLIC_API_KEY, appUserId: currentUser.getUsername() });
+    window.rcInstance = rc;
+}
+if (!rc) throw new Error("RevenueCat not initialized after purchase.");
+await rc.syncPurchases();
                         await updateTierFromRevenueCat();
                         
                         if (currentUser.tier === 'Pro') {
