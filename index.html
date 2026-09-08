@@ -1491,14 +1491,26 @@
                         
                         await response.complete('success');
                         
-                       let rc = window.rcInstance;
-if (!rc && typeof Purchases !== 'undefined' && currentUser) {
-    const rcClass = Purchases.Purchases || Purchases;
-  rc = rcClass.configure({ apiKey: REVENUECAT_WEB_KEY, appUserId: currentUser.getUsername() });
-    window.rcInstance = rc;
-}
-if (!rc) throw new Error("RevenueCat not initialized after purchase.");
-await rc.syncPurchases();
+                        const purchaseToken = response.details.token;
+
+                        const rcResponse = await fetch('https://api.revenuecat.com/v1/receipts', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${REVENUECAT_ANDROID_KEY}`,
+                                'Content-Type': 'application/json',
+                                'X-Platform': 'android'
+                            },
+                            body: JSON.stringify({
+                                app_user_id: currentUser.getUsername(),
+                                fetch_token: purchaseToken,
+                                product_id: sku
+                            })
+                        });
+
+                        if (!rcResponse.ok) {
+                            throw new Error("Failed to validate Play Store receipt with RevenueCat");
+                        }
+                        
                         await updateTierFromRevenueCat();
                         
                         if (currentUser.tier === 'Pro') {
