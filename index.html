@@ -254,7 +254,7 @@
                         <li class="flex items-center gap-3"><i class="fas fa-check text-blue-500"></i>Offline LocalStorage</li>
                         <li class="flex items-center gap-3"><i class="fas fa-check text-blue-500"></i>Basic Circular Economy Score</li>
                     </ul>
-                    <button id="paywall-free-btn" onclick="handleDowngradeNotice()" class="w-full py-3 px-4 rounded-xl font-bold transition-all bg-gray-700 text-white hover:bg-gray-600 uppercase text-[10px] tracking-widest">Switch to Free</button>
+                    <button id="paywall-free-btn" onclick="handleManageSubscription()" class="w-full py-3 px-4 rounded-xl font-bold transition-all bg-gray-700 text-white hover:bg-gray-600 uppercase text-[10px] tracking-widest">Switch to Free</button>
                 </div>
 
                 <div class="p-8 flex flex-col bg-blue-900/10 border-x-0 md:border-x border-blue-500/50 relative">
@@ -458,9 +458,6 @@
 
         const REVENUECAT_ANDROID_KEY = 'goog_MadNpQoboAIdqIQbRVAiPBNmovB';
         const REVENUECAT_WEB_KEY = 'rcb_HZKPkgLDQNnGHpKnVRBvKQLKMtWM';
-        const REVENUECAT_PUBLIC_API_KEY = ('getDigitalGoodsService' in window) 
-            ? REVENUECAT_ANDROID_KEY 
-            : REVENUECAT_WEB_KEY;
 
         let vaultData = JSON.parse(localStorage.getItem('sustainVault')) || [];
         let currentTab = 'vehicle';
@@ -489,6 +486,7 @@
             try {
                 const payload = JSON.parse(base64UrlDecode(idTokenString.split('.')[1]));
                 const username = payload['cognito:username'] || payload['sub'];
+                const sub = payload['sub']; // Stable UID
                 const email = payload['email']; 
 
                 const idToken = new AmazonCognitoIdentity.CognitoIdToken({ IdToken: idTokenString });
@@ -507,6 +505,7 @@
                 cognitoUser.setSignInUserSession(session);
 
                 currentUser = cognitoUser;
+                currentUser.sub = sub; // Attach stable sub to user object
 
                 const showElements = ['dashboard', 'nav-tabs', 'add-item-btn', 'user-display', 'danger-zone', 'header-stats', 'filter-sort-bar'];
                 showElements.forEach(id => {
@@ -527,7 +526,7 @@
                     const rcClass = Purchases.Purchases || Purchases;
                     window.rcInstance = rcClass.configure({
                         apiKey: REVENUECAT_WEB_KEY,
-                        appUserId: username
+                        appUserId: sub
                     });
                     updateTierFromRevenueCat();
                 }
@@ -1319,6 +1318,10 @@
                         }
                         
                         currentUser = cognitoUser;
+                        
+                        // Extract immutable 'sub' claim to prevent cross-login identity splitting
+                        const sub = session.getIdToken().payload.sub;
+                        currentUser.sub = sub;
 
                         const showElements = ['dashboard', 'nav-tabs', 'add-item-btn', 'user-display', 'danger-zone', 'header-stats'];
                         showElements.forEach(id => {
@@ -1338,7 +1341,7 @@
                                 const rcClass = Purchases.Purchases || Purchases;
                                 window.rcInstance = rcClass.configure({
                                     apiKey: REVENUECAT_WEB_KEY,
-                                    appUserId: cognitoUser.getUsername()
+                                    appUserId: sub
                                 });
                                 updateTierFromRevenueCat();
                             } catch (rcError) {
@@ -1411,7 +1414,7 @@
                 let rc = window.rcInstance;
                 if (!rc && typeof Purchases !== 'undefined' && currentUser) {
                     const rcClass = Purchases.Purchases || Purchases;
-                    rc = rcClass.configure({ apiKey: REVENUECAT_WEB_KEY, appUserId: currentUser.getUsername() });
+                    rc = rcClass.configure({ apiKey: REVENUECAT_WEB_KEY, appUserId: currentUser.sub || currentUser.getUsername() });
                     window.rcInstance = rc;
                 }
 
@@ -1445,8 +1448,36 @@
             window.location.href = "mailto:support@maintenancevault.com?subject=ProCom Waitlist Interest&body=I am interested in the ProCom tier for fleets and crews. Please notify me when it's available.";
         }
 
-        function handleDowngradeNotice() {
-            alert("To downgrade or cancel your subscription securely, please manage it directly through your emailed receipt layout link or contact support@maintenancevault.com.");
+        async function handleManageSubscription() {
+            const btn = document.getElementById('paywall-free-btn');
+            const originalText = btn.innerText;
+            btn.innerText = "LOADING...";
+            
+            try {
+                let rc = window.rcInstance;
+                if (!rc && typeof Purchases !== 'undefined' && currentUser) {
+                    const rcClass = Purchases.Purchases || Purchases;
+                    rc = rcClass.configure({ apiKey: REVENUECAT_WEB_KEY, appUserId: currentUser.sub || currentUser.getUsername() });
+                    window.rcInstance = rc;
+                }
+                
+                let url = null;
+                if (rc) {
+                    const customerInfo = await rc.getCustomerInfo();
+                    url = customerInfo.managementURL;
+                }
+                
+                if (url) {
+                    window.open(url, '_blank');
+                } else {
+                    window.open('https://play.google.com/store/account/subscriptions', '_blank');
+                }
+            } catch (e) {
+                console.error("Management URL Error:", e);
+                window.open('https://play.google.com/store/account/subscriptions', '_blank');
+            } finally {
+                btn.innerText = originalText;
+            }
         }
 
         function togglePaywall() {
@@ -1466,6 +1497,7 @@
 
                 freeBtn.disabled = false;
                 freeBtn.innerText = "Switch to Free";
+                freeBtn.onclick = handleManageSubscription;
                 freeBtn.className = "w-full py-3 px-4 rounded-xl font-bold transition-all bg-gray-700 text-white hover:bg-gray-600 uppercase text-[10px] tracking-widest";
 
                 proMoBtn.disabled = false;
@@ -1481,6 +1513,10 @@
                     freeBtn.innerText = "Current Plan";
                     freeBtn.className = "w-full py-3 px-4 rounded-xl font-bold transition-all bg-gray-800 text-gray-500 cursor-not-allowed uppercase text-[10px] tracking-widest";
                 } else if (tier === 'Pro') {
+                    freeBtn.disabled = false;
+                    freeBtn.innerText = "Manage / Cancel Plan";
+                    freeBtn.className = "w-full py-3 px-4 rounded-xl font-bold transition-all bg-red-900/50 border border-red-900/50 text-red-200 hover:bg-red-800 hover:text-white uppercase text-[10px] tracking-widest";
+                    
                     if (activeProd.includes('mo') || activeProd.includes('Monthly') || activeProd === 'prod_UtaRl0alrq8tYQ' || activeProd === 'prodf0eaca2a90') {
                         proMoBtn.disabled = true;
                         proMoBtn.innerHTML = "Current Plan";
@@ -1521,7 +1557,7 @@
                                 'X-Platform': 'android'
                             },
                             body: JSON.stringify({
-                                app_user_id: currentUser.getUsername(),
+                                app_user_id: currentUser.sub || currentUser.getUsername(),
                                 fetch_token: purchaseToken,
                                 product_id: sku
                             })
@@ -1550,7 +1586,7 @@
                 let rc = window.rcInstance;
                 if (!rc && typeof Purchases !== 'undefined' && currentUser) {
                     const rcClass = Purchases.Purchases || Purchases;
-                    rc = rcClass.configure({ apiKey: REVENUECAT_WEB_KEY, appUserId: currentUser.getUsername() });
+                    rc = rcClass.configure({ apiKey: REVENUECAT_WEB_KEY, appUserId: currentUser.sub || currentUser.getUsername() });
                     window.rcInstance = rc;
                 }
 
