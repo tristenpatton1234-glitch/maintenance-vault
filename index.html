@@ -526,7 +526,7 @@
                 if (typeof Purchases !== 'undefined') {
                     const rcClass = Purchases.Purchases || Purchases;
                     window.rcInstance = rcClass.configure({
-                        apiKey: REVENUECAT_PUBLIC_API_KEY,
+                        apiKey: REVENUECAT_WEB_KEY,
                         appUserId: username
                     });
                     updateTierFromRevenueCat();
@@ -841,11 +841,31 @@
             });
         }
 
+        function deleteItem(itemId) {
+            itemToDelete = itemId;
+            toggleDeleteItemModal();
+        }
+
         function toggleDeleteItemModal() {
             const modal = document.getElementById('delete-item-modal');
             modal.classList.toggle('hidden');
             if (modal.classList.contains('hidden')) {
                 itemToDelete = null;
+            }
+        }
+
+        function confirmDeleteItem() {
+            if (itemToDelete) {
+                const index = vaultData.findIndex(item => item.itemId === itemToDelete);
+                if (index > -1) {
+                    vaultData[index].isDeleted = true;
+                    vaultData[index].updatedAt = new Date().toISOString();
+                }
+                localStorage.setItem('sustainVault', JSON.stringify(vaultData));
+                renderVault();
+                updateStats();
+                syncToAWS();
+                toggleDeleteItemModal();
             }
         }
 
@@ -1317,7 +1337,7 @@
                             try {
                                 const rcClass = Purchases.Purchases || Purchases;
                                 window.rcInstance = rcClass.configure({
-                                    apiKey: REVENUECAT_PUBLIC_API_KEY,
+                                    apiKey: REVENUECAT_WEB_KEY,
                                     appUserId: cognitoUser.getUsername()
                                 });
                                 updateTierFromRevenueCat();
@@ -1391,7 +1411,7 @@
                 let rc = window.rcInstance;
                 if (!rc && typeof Purchases !== 'undefined' && currentUser) {
                     const rcClass = Purchases.Purchases || Purchases;
-                    rc = rcClass.configure({ apiKey: REVENUECAT_PUBLIC_API_KEY, appUserId: currentUser.getUsername() });
+                    rc = rcClass.configure({ apiKey: REVENUECAT_WEB_KEY, appUserId: currentUser.getUsername() });
                     window.rcInstance = rc;
                 }
 
@@ -1530,7 +1550,7 @@
                 let rc = window.rcInstance;
                 if (!rc && typeof Purchases !== 'undefined' && currentUser) {
                     const rcClass = Purchases.Purchases || Purchases;
-                    rc = rcClass.configure({ apiKey: REVENUECAT_PUBLIC_API_KEY, appUserId: currentUser.getUsername() });
+                    rc = rcClass.configure({ apiKey: REVENUECAT_WEB_KEY, appUserId: currentUser.getUsername() });
                     window.rcInstance = rc;
                 }
 
