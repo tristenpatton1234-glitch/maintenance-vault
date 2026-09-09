@@ -231,8 +231,8 @@
     <footer class="max-w-4xl mx-auto w-full p-6 border-t border-gray-800 text-center pb-24">
         <p class="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-2">System Notice</p>
         <p class="text-xs text-gray-500 leading-relaxed max-w-md mx-auto">
-            ⚠️ <strong>Data stored locally.</strong> This app operates offline. Clearing your browser cache or site data will permanently delete your maintenance logs. 
-            <a href="javascript:void(0)" onclick="exportToCSV()" class="text-blue-500 hover:underline">Back up your logs now</a>.
+            <span id="storage-notice">⚠️ <strong>Data stored locally.</strong> This app operates offline. Clearing your browser cache or site data will permanently delete your maintenance logs. 
+            <a href="javascript:void(0)" onclick="exportToCSV()" class="text-blue-500 hover:underline">Back up your logs now</a>.</span>
             <br>Not professional mechanic advice; use specs at your own risk.
         </p>
     </footer>
@@ -470,6 +470,18 @@
             let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
             while (base64.length % 4) base64 += '=';
             return atob(base64);
+        }
+
+        function updateStorageNotice() {
+            const notice = document.getElementById('storage-notice');
+            if (!notice) return;
+            const isPro = currentUser && currentUser.tier === 'Pro';
+            if (isPro) {
+                notice.innerHTML = '✅ <strong>Cloud sync active.</strong> Your data is backed up to the cloud and available on any device you sign in on.';
+            } else {
+                notice.innerHTML = '⚠️ <strong>Data stored locally.</strong> This app operates offline. Clearing your browser cache or site data will permanently delete your maintenance logs. ' +
+                    '<a href="javascript:void(0)" onclick="exportToCSV()" class="text-blue-500 hover:underline">Back up your logs now</a>.';
+            }
         }
 
         function handleHostedUICallback() {
@@ -1405,6 +1417,7 @@
             });
 
             switchAuthMode('signin');
+            updateStorageNotice();
             renderVault();
             updateStats();
         }
@@ -1438,6 +1451,7 @@
                     const badge = document.getElementById('pro-badge');
                     if(badge) badge.classList.add('hidden');
                 }
+                updateStorageNotice();
                 renderVault();
             } catch (e) {
                 console.error("RevenueCat Error:", e);
